@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
-const API_URL = "hhttps://footballiq-backend-production-089f.up.railway.app";
+const API_URL = "https://footballiq-backend-production-089f.up.railway.app";
 async function apiPost(endpoint, body, token = null) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
