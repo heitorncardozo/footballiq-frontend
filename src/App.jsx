@@ -448,32 +448,49 @@ function PlansPage() {
 }
 
 // ── Main Dashboard ─────────────────────────────────────────────────────────────
+const LIGAS = [
+  { code: "PL",  nome: "Premier League",    flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+  { code: "CL",  nome: "Champions League",  flag: "⭐" },
+  { code: "PD",  nome: "La Liga",           flag: "🇪🇸" },
+  { code: "SA",  nome: "Serie A",           flag: "🇮🇹" },
+  { code: "BL1", nome: "Bundesliga",        flag: "🇩🇪" },
+  { code: "FL1", nome: "Ligue 1",           flag: "🇫🇷" },
+];
+
 function Dashboard({ user, onUpdateUser, onLogout }) {
   const [page, setPage] = useState("dashboard");
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState("all");
   const [analyses, setAnalyses] = useState(MOCK_ANALYSIS);
   const [loading, setLoading] = useState(false);
+  const [league, setLeague] = useState("PL");
 
-  // Carrega dados reais da API ao iniciar
+  // Carrega dados reais da API ao trocar de liga
   useEffect(() => {
     const loadData = async () => {
       if (!user.token) return;
       setLoading(true);
+      setSelected(null);
+      setAnalyses([]);
       try {
-        const data = await apiGet("/analysis/today?league=BSA", user.token);
+        const data = await apiGet(`/analysis/today?league=${league}`, user.token);
         if (data && data.length > 0) {
           setAnalyses(data);
           setSelected(data[0]);
+        } else {
+          // Fallback para demo se não houver dados
+          setAnalyses(MOCK_ANALYSIS);
+          setSelected(MOCK_ANALYSIS[0]);
         }
       } catch (e) {
         console.log("Usando dados demo:", e.message);
+        setAnalyses(MOCK_ANALYSIS);
         setSelected(MOCK_ANALYSIS[0]);
       }
       setLoading(false);
     };
     loadData();
-  }, [user.token]);
+  }, [user.token, league]);
 
   const totalVbs = analyses.flatMap(m => m.value_bets.filter(v => v.is_vb)).length;
   const filtered = filter === "value" ? analyses.filter(m => m.value_bets.some(v => v.is_vb)) : analyses;
@@ -511,12 +528,25 @@ function Dashboard({ user, onUpdateUser, onLogout }) {
       </aside>
 
       <main className="flex-1 overflow-hidden flex flex-col bg-zinc-950">
-        <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between shrink-0">
-          <div>
-            <h1 className="font-black text-white text-base">{page === "dashboard" ? "Jogos de Hoje" : page === "valuebets" ? "Value Bets" : page === "historico" ? "Histórico" : "Planos"}</h1>
-            <p className="text-xs text-zinc-500 font-mono">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</p>
+        <header className="border-b border-zinc-800 px-6 py-4 shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="font-black text-white text-base">{page === "dashboard" ? "Jogos de Hoje" : page === "valuebets" ? "Value Bets" : page === "historico" ? "Histórico" : "Planos"}</h1>
+              <p className="text-xs text-zinc-500 font-mono">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</p>
+            </div>
+            <div className="text-xs bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-zinc-400">{analyses.length} jogos · {totalVbs} value bets</div>
           </div>
-          <div className="text-xs bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-zinc-400">{analyses.length} jogos · {totalVbs} value bets</div>
+          {page === "dashboard" && (
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {LIGAS.map(l => (
+                <button key={l.code} onClick={() => setLeague(l.code)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${league === l.code ? "bg-emerald-900 text-emerald-300 border border-emerald-700" : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"}`}>
+                  <span>{l.flag}</span>
+                  <span>{l.nome}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </header>
 
         <div className="flex-1 overflow-auto p-5">
@@ -568,4 +598,4 @@ export default function App() {
       }
     </div>
   );
-};
+}
