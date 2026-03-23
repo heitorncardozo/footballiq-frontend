@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 const API_URL = "https://footballiq-backend-production-089f.up.railway.app";
+
 async function apiPost(endpoint, body, token = null) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -9,6 +10,14 @@ async function apiPost(endpoint, body, token = null) {
   const data = await r.json();
   if (!r.ok) throw new Error(data.detail || "Erro desconhecido");
   return data;
+}
+
+async function apiGet(endpoint, token = null) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const r = await fetch(`${API_URL}${endpoint}`, { headers });
+  if (!r.ok) throw new Error("Erro na requisição");
+  return r.json();
 }
 
 const MOCK_ANALYSIS = [
@@ -391,8 +400,8 @@ function MatchDetail({ match }) {
   );
 }
 
-function ValueBetsPage() {
-  const all = MOCK_ANALYSIS.flatMap(m => m.value_bets.filter(v => v.is_vb).map(v => ({ ...v, partida: `${m.home_team} vs ${m.away_team}`, data: m.data }))).sort((a, b) => b.ev - a.ev);
+function ValueBetsPage({ analyses = MOCK_ANALYSIS }) {
+  const all = analyses.flatMap(m => m.value_bets.filter(v => v.is_vb).map(v => ({ ...v, partida: `${m.home_team} vs ${m.away_team}`, data: m.data }))).sort((a, b) => b.ev - a.ev);
   return (
     <div>
       <h2 className="text-xl font-black text-white mb-1">Value Bets do Dia</h2>
@@ -441,10 +450,33 @@ function PlansPage() {
 // ── Main Dashboard ─────────────────────────────────────────────────────────────
 function Dashboard({ user, onUpdateUser, onLogout }) {
   const [page, setPage] = useState("dashboard");
-  const [selected, setSelected] = useState(MOCK_ANALYSIS[0]);
+  const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState("all");
-  const totalVbs = MOCK_ANALYSIS.flatMap(m => m.value_bets.filter(v => v.is_vb)).length;
-  const filtered = filter === "value" ? MOCK_ANALYSIS.filter(m => m.value_bets.some(v => v.is_vb)) : MOCK_ANALYSIS;
+  const [analyses, setAnalyses] = useState(MOCK_ANALYSIS);
+  const [loading, setLoading] = useState(false);
+
+  // Carrega dados reais da API ao iniciar
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user.token) return;
+      setLoading(true);
+      try {
+        const data = await apiGet("/analysis/today?league=BSA", user.token);
+        if (data && data.length > 0) {
+          setAnalyses(data);
+          setSelected(data[0]);
+        }
+      } catch (e) {
+        console.log("Usando dados demo:", e.message);
+        setSelected(MOCK_ANALYSIS[0]);
+      }
+      setLoading(false);
+    };
+    loadData();
+  }, [user.token]);
+
+  const totalVbs = analyses.flatMap(m => m.value_bets.filter(v => v.is_vb)).length;
+  const filtered = filter === "value" ? analyses.filter(m => m.value_bets.some(v => v.is_vb)) : analyses;
   const nav = [["dashboard","⚡","Dashboard"],["valuebets","✦","Value Bets"],["historico","📊","Histórico"],["planos","💎","Planos"],["conta","👤","Minha Conta"]];
 
   if (page === "conta") return <AccountPage user={user} onUpdateUser={(u) => { onUpdateUser(u); }} onLogout={onLogout} onBack={() => setPage("dashboard")} />;
@@ -484,7 +516,7 @@ function Dashboard({ user, onUpdateUser, onLogout }) {
             <h1 className="font-black text-white text-base">{page === "dashboard" ? "Jogos de Hoje" : page === "valuebets" ? "Value Bets" : page === "historico" ? "Histórico" : "Planos"}</h1>
             <p className="text-xs text-zinc-500 font-mono">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</p>
           </div>
-          <div className="text-xs bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-zinc-400">{MOCK_ANALYSIS.length} jogos · {totalVbs} value bets</div>
+          <div className="text-xs bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 font-mono text-zinc-400">{analyses.length} jogos · {totalVbs} value bets</div>
         </header>
 
         <div className="flex-1 overflow-auto p-5">
@@ -496,12 +528,12 @@ function Dashboard({ user, onUpdateUser, onLogout }) {
                     <button key={f} onClick={() => setFilter(f)} className={`flex-1 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${filter===f ? "bg-emerald-900 text-emerald-300 border border-emerald-700" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>{l}</button>
                   ))}
                 </div>
-                {filtered.map(m => <MatchCard key={m.id} match={m} onClick={setSelected} selected={selected?.id === m.id} />)}
+                {loading ? <div className="text-zinc-500 text-sm text-center py-8">Carregando partidas...</div> : filtered.map(m => <MatchCard key={m.id} match={m} onClick={setSelected} selected={selected?.id === m.id} />)}
               </div>
               <div className="flex-1 overflow-auto"><MatchDetail match={selected} /></div>
             </div>
           )}
-          {page === "valuebets" && <ValueBetsPage />}
+          {page === "valuebets" && <ValueBetsPage analyses={analyses} />}
           {page === "historico" && (
             <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
               <span className="text-5xl">📊</span>
@@ -536,4 +568,4 @@ export default function App() {
       }
     </div>
   );
-}
+};
