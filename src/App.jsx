@@ -20,31 +20,33 @@ async function apiGet(endpoint, token = null) {
   return r.json();
 }
 
-async function generateAITip(match) {
-  const p = match.probabilidades;
+async function generateAITip(match, token) {
+  const p = match.probabilidades || {};
   const vbs = (match.value_bets || []).filter(v => v.is_vb);
-  const prompt = `Você é um analista especializado em apostas esportivas. Com base nos dados abaixo, gere um palpite curto e direto em português brasileiro (máximo 4 linhas), com tom profissional mas acessível. Não use markdown, não use asteriscos.
 
-Jogo: ${match.home_team} vs ${match.away_team}
-Liga: ${match.liga || ""}
-Gols esperados: Casa ${match.home_goals_exp}, Fora ${match.away_goals_exp}
-Probabilidades: Casa ${(p.home_win*100).toFixed(0)}%, Empate ${(p.draw*100).toFixed(0)}%, Fora ${(p.away_win*100).toFixed(0)}%
-Over 2.5 gols: ${(p.over_2_5*100).toFixed(0)}%
-Value bets encontrados: ${vbs.length > 0 ? vbs.map(v => v.mercado + " (odd " + v.odd + ", EV +" + v.ev + ")").join(", ") : "Nenhum"}
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
-Gere o palpite:`;
-
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
+  const r = await fetch(`${API_URL}/ai/tip`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 300,
-      messages: [{ role: "user", content: prompt }],
+      home_team:      match.home_team,
+      away_team:      match.away_team,
+      liga:           match.liga || "",
+      home_goals_exp: match.home_goals_exp || match.hge || 0,
+      away_goals_exp: match.away_goals_exp || match.age || 0,
+      prob_home:      p.home_win  || 0,
+      prob_draw:      p.draw      || 0,
+      prob_away:      p.away_win  || 0,
+      prob_over25:    p.over_2_5  || 0,
+      value_bets:     vbs,
     }),
   });
+
+  if (!r.ok) throw new Error("Erro no servidor");
   const data = await r.json();
-  return data.content?.[0]?.text || "Não foi possível gerar o palpite.";
+  return data.tip || "Não foi possível gerar o palpite.";
 }
 
 const MOCK_ANALYSIS = [
@@ -376,7 +378,7 @@ function MatchCard({ match, onClick, selected }) {
 
 
 // ── AI Tip Card ────────────────────────────────────────────────────────────────
-function AITipCard({ match }) {
+function AITipCard({ match, token }) {
   const [tip, setTip] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -385,7 +387,7 @@ function AITipCard({ match }) {
     setLoading(true);
     setError(null);
     try {
-      const result = await generateAITip(match);
+      const result = await generateAITip(match, token);
       setTip(result);
     } catch (e) {
       setError("Erro ao gerar palpite. Tente novamente.");
@@ -434,7 +436,7 @@ function AITipCard({ match }) {
   );
 }
 
-function MatchDetail({ match }) {
+function MatchDetail({ match, token }) {
   if (!match) return <div className="flex flex-col items-center justify-center h-full text-zinc-600 gap-3"><span className="text-5xl">⚽</span><p className="text-sm">Selecione uma partida</p></div>;
   const p = match.probabilidades;
   const chartData = [
@@ -485,7 +487,7 @@ function MatchDetail({ match }) {
       </div>
 
       {/* AI Tip */}
-      <AITipCard match={match} />
+      <AITipCard match={match} token={token} />
     </div>
   );
 }
@@ -900,7 +902,7 @@ function Dashboard({ user, onUpdateUser, onLogout }) {
                 {loading ? <div className="text-zinc-500 text-sm text-center py-8">Carregando partidas...</div> : filtered.map(m => <MatchCard key={m.id} match={getMatch(m)} onClick={setSelected} selected={selected?.id === m.id} />)}
               </div>
               <div className="flex-1 overflow-auto">
-                <MatchDetail match={selected} />
+                <MatchDetail match={selected} token={user?.token} />
                 {selected && (
                   <div className="mt-4">
                     <button onClick={() => setModalMatch(selected)}
