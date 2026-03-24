@@ -448,6 +448,148 @@ function PlansPage() {
 }
 
 // ── Main Dashboard ─────────────────────────────────────────────────────────────
+
+// ── Manual Odds Modal ──────────────────────────────────────────────────────────
+function ManualOddsModal({ match, onSave, onClose }) {
+  const [odds, setOdds] = useState({
+    home_win: "", draw: "", away_win: "", over_2_5: "", under_2_5: ""
+  });
+  const [casa, setCasa] = useState("Betano");
+  const calc = ProbCalc ? new Object() : null;
+
+  const p = match.probabilidades;
+  const justas = {
+    home_win:  p.home_win  > 0 ? (1/p.home_win).toFixed(2)  : "—",
+    draw:      p.draw      > 0 ? (1/p.draw).toFixed(2)      : "—",
+    away_win:  p.away_win  > 0 ? (1/p.away_win).toFixed(2)  : "—",
+    over_2_5:  p.over_2_5  > 0 ? (1/p.over_2_5).toFixed(2)  : "—",
+    under_2_5: p.under_2_5 > 0 ? (1/p.under_2_5).toFixed(2) : "—",
+  };
+
+  const calcEV = (prob, odd) => {
+    const o = parseFloat(odd?.toString().replace(",", "."));
+    if (!o || o <= 1) return null;
+    return (prob * o - 1).toFixed(3);
+  };
+
+  const fields = [
+    { key: "home_win",  label: `Casa (1) — ${match.home_team}`, prob: p.home_win },
+    { key: "draw",      label: "Empate (X)",                     prob: p.draw },
+    { key: "away_win",  label: `Fora (2) — ${match.away_team}`,  prob: p.away_win },
+    { key: "over_2_5",  label: "Over 2.5 gols",                  prob: p.over_2_5 },
+    { key: "under_2_5", label: "Under 2.5 gols",                 prob: p.under_2_5 },
+  ];
+
+  const handleSave = () => {
+    const result = fields.map(f => {
+      const odd = parseFloat(odds[f.key]?.toString().replace(",", "."));
+      if (!odd || odd <= 1) return null;
+      const ev = parseFloat(calcEV(f.prob, odd));
+      return {
+        mercado:    f.label.split(" — ")[0],
+        odd,
+        prob_calc:  parseFloat((f.prob * 100).toFixed(1)),
+        prob_impl:  parseFloat((100/odd).toFixed(1)),
+        ev,
+        is_vb:      ev > 0.05,
+      };
+    }).filter(Boolean);
+
+    onSave({ ...match, value_bets: result, odds_fonte: casa });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+          <div>
+            <h3 className="font-black text-white">Inserir Odds</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">{match.home_team} vs {match.away_team}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white text-xl cursor-pointer">×</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Casa de aposta */}
+          <div>
+            <label className="text-xs text-zinc-400 mb-2 block font-semibold">Casa de aposta</label>
+            <div className="flex gap-2">
+              {["Betano", "Bet365", "KTO", "Sportingbet", "Outra"].map(c => (
+                <button key={c} onClick={() => setCasa(c)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${casa === c ? "bg-emerald-900 text-emerald-300 border border-emerald-700" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Probabilidades de referência */}
+          <div className="bg-zinc-800/50 rounded-xl p-3">
+            <p className="text-[10px] text-zinc-500 mb-2 font-semibold uppercase tracking-wider">Odds justas calculadas (referência)</p>
+            <div className="grid grid-cols-5 gap-1 text-center">
+              {fields.map(f => (
+                <div key={f.key} className="bg-zinc-800 rounded-lg p-1.5">
+                  <p className="text-[9px] text-zinc-500">{f.key === "over_2_5" ? "Over" : f.key === "under_2_5" ? "Under" : f.key === "home_win" ? "Casa" : f.key === "draw" ? "Emp." : "Fora"}</p>
+                  <p className="text-xs font-bold text-emerald-400">{justas[f.key]}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Campos de odds */}
+          <div className="space-y-3">
+            {fields.map(f => {
+              const ev = calcEV(f.prob, odds[f.key]);
+              const evNum = parseFloat(ev);
+              const isValue = evNum > 0.05;
+              const hasOdd = odds[f.key] && parseFloat(odds[f.key]) > 1;
+              return (
+                <div key={f.key} className={`rounded-xl p-3 border transition-all ${hasOdd && isValue ? "bg-emerald-950/40 border-emerald-800" : "bg-zinc-800/50 border-zinc-700"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <label className="text-xs text-zinc-400 block mb-1">{f.label}</label>
+                      <input
+                        type="text"
+                        placeholder={`Odd justa: ${justas[f.key]}`}
+                        value={odds[f.key]}
+                        onChange={e => setOdds({ ...odds, [f.key]: e.target.value })}
+                        className="w-full bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-emerald-600 transition-colors"
+                      />
+                    </div>
+                    {hasOdd && (
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] text-zinc-500">EV</p>
+                        <p className={`text-sm font-black ${isValue ? "text-emerald-400" : evNum > 0 ? "text-amber-400" : "text-red-400"}`}>
+                          {evNum > 0 ? "+" : ""}{ev}
+                        </p>
+                        {isValue && <p className="text-[9px] text-emerald-500 font-bold">VALUE ✦</p>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-[10px] text-zinc-600">Pressione Enter em branco para pular um mercado. EV &gt; 0.05 indica value bet.</p>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 p-5 border-t border-zinc-800">
+          <button onClick={onClose} className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-xl text-sm cursor-pointer transition-all">
+            Cancelar
+          </button>
+          <button onClick={handleSave} className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl text-sm cursor-pointer transition-all">
+            Calcular e Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const LIGAS = [
   { code: "PL",  nome: "Premier League",    flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
   { code: "CL",  nome: "Champions League",  flag: "⭐" },
@@ -464,6 +606,15 @@ function Dashboard({ user, onUpdateUser, onLogout }) {
   const [analyses, setAnalyses] = useState(MOCK_ANALYSIS);
   const [loading, setLoading] = useState(false);
   const [league, setLeague] = useState("PL");
+  const [modalMatch, setModalMatch] = useState(null);
+  const [manualOdds, setManualOdds] = useState({});
+
+  const handleManualOdds = (updatedMatch) => {
+    setManualOdds(prev => ({ ...prev, [updatedMatch.id || updatedMatch.partida]: updatedMatch }));
+    setSelected(updatedMatch);
+  };
+
+  const getMatch = (m) => manualOdds[m.id || m.partida] || m;
 
   // Carrega dados reais da API ao trocar de liga
   useEffect(() => {
@@ -552,15 +703,32 @@ function Dashboard({ user, onUpdateUser, onLogout }) {
         <div className="flex-1 overflow-auto p-5">
           {page === "dashboard" && (
             <div className="flex gap-5 h-full min-h-0">
+              {modalMatch && (
+                <ManualOddsModal
+                  match={modalMatch}
+                  onSave={handleManualOdds}
+                  onClose={() => setModalMatch(null)}
+                />
+              )}
               <div className="w-72 shrink-0 flex flex-col gap-3 overflow-auto pr-1">
                 <div className="flex gap-2 shrink-0">
                   {[["all","Todos"],["value","✦ Value"]].map(([f,l]) => (
                     <button key={f} onClick={() => setFilter(f)} className={`flex-1 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${filter===f ? "bg-emerald-900 text-emerald-300 border border-emerald-700" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>{l}</button>
                   ))}
                 </div>
-                {loading ? <div className="text-zinc-500 text-sm text-center py-8">Carregando partidas...</div> : filtered.map(m => <MatchCard key={m.id} match={m} onClick={setSelected} selected={selected?.id === m.id} />)}
+                {loading ? <div className="text-zinc-500 text-sm text-center py-8">Carregando partidas...</div> : filtered.map(m => <MatchCard key={m.id} match={getMatch(m)} onClick={setSelected} selected={selected?.id === m.id} />)}
               </div>
-              <div className="flex-1 overflow-auto"><MatchDetail match={selected} /></div>
+              <div className="flex-1 overflow-auto">
+                <MatchDetail match={selected} />
+                {selected && (
+                  <div className="mt-4">
+                    <button onClick={() => setModalMatch(selected)}
+                      className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-emerald-700 text-zinc-300 hover:text-emerald-300 font-bold rounded-2xl text-sm cursor-pointer transition-all flex items-center justify-center gap-2">
+                      ✏️ Inserir odds manualmente (Betano, KTO, Bet365...)
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {page === "valuebets" && <ValueBetsPage analyses={analyses} />}
