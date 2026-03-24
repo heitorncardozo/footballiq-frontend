@@ -455,7 +455,7 @@ function ManualOddsModal({ match, onSave, onClose }) {
     home_win: "", draw: "", away_win: "", over_2_5: "", under_2_5: ""
   });
   const [casa, setCasa] = useState("Betano");
-  const calc = ProbCalc ? new Object() : null;
+
 
   const p = match.probabilidades;
   const justas = {
