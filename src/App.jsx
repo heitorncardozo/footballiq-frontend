@@ -20,6 +20,33 @@ async function apiGet(endpoint, token = null) {
   return r.json();
 }
 
+async function generateAITip(match) {
+  const p = match.probabilidades;
+  const vbs = (match.value_bets || []).filter(v => v.is_vb);
+  const prompt = `Você é um analista especializado em apostas esportivas. Com base nos dados abaixo, gere um palpite curto e direto em português brasileiro (máximo 4 linhas), com tom profissional mas acessível. Não use markdown, não use asteriscos.
+
+Jogo: ${match.home_team} vs ${match.away_team}
+Liga: ${match.liga || ""}
+Gols esperados: Casa ${match.home_goals_exp}, Fora ${match.away_goals_exp}
+Probabilidades: Casa ${(p.home_win*100).toFixed(0)}%, Empate ${(p.draw*100).toFixed(0)}%, Fora ${(p.away_win*100).toFixed(0)}%
+Over 2.5 gols: ${(p.over_2_5*100).toFixed(0)}%
+Value bets encontrados: ${vbs.length > 0 ? vbs.map(v => v.mercado + " (odd " + v.odd + ", EV +" + v.ev + ")").join(", ") : "Nenhum"}
+
+Gere o palpite:`;
+
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 300,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  const data = await r.json();
+  return data.content?.[0]?.text || "Não foi possível gerar o palpite.";
+}
+
 const MOCK_ANALYSIS = [
   { id: 1, home_team: "Flamengo", away_team: "Palmeiras", liga: "Brasileirão Série A", data: "2026-03-20", home_goals_exp: 2.1, away_goals_exp: 1.4, probabilidades: { home_win: 0.536, draw: 0.210, away_win: 0.254, over_2_5: 0.679 }, value_bets: [{ mercado: "Over 2.5", odd: 1.65, prob_calc: 67.9, prob_impl: 60.6, ev: 0.121, is_vb: true }, { mercado: "Fora (2)", odd: 4.20, prob_calc: 25.4, prob_impl: 23.8, ev: 0.067, is_vb: true }, { mercado: "Casa (1)", odd: 1.78, prob_calc: 53.6, prob_impl: 56.2, ev: -0.046, is_vb: false }, { mercado: "Empate (X)", odd: 3.90, prob_calc: 21.0, prob_impl: 25.6, ev: -0.181, is_vb: false }] },
   { id: 2, home_team: "São Paulo", away_team: "Corinthians", liga: "Brasileirão Série A", data: "2026-03-20", home_goals_exp: 1.3, away_goals_exp: 1.3, probabilidades: { home_win: 0.368, draw: 0.264, away_win: 0.368, over_2_5: 0.482 }, value_bets: [{ mercado: "Casa (1)", odd: 2.54, prob_calc: 36.8, prob_impl: 39.4, ev: -0.066, is_vb: false }, { mercado: "Empate (X)", odd: 3.20, prob_calc: 26.4, prob_impl: 31.2, ev: -0.155, is_vb: false }, { mercado: "Under 2.5", odd: 1.85, prob_calc: 51.8, prob_impl: 54.1, ev: -0.042, is_vb: false }] },
@@ -347,6 +374,66 @@ function MatchCard({ match, onClick, selected }) {
   );
 }
 
+
+// ── AI Tip Card ────────────────────────────────────────────────────────────────
+function AITipCard({ match }) {
+  const [tip, setTip] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const generate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await generateAITip(match);
+      setTip(result);
+    } catch (e) {
+      setError("Erro ao gerar palpite. Tente novamente.");
+    }
+    setLoading(false);
+  };
+
+  // Reset when match changes
+  useEffect(() => { setTip(null); setError(null); }, [match?.partida]);
+
+  return (
+    <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-5">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs text-zinc-400 font-semibold uppercase tracking-widest">🤖 Palpite com IA</p>
+        {!loading && (
+          <button onClick={generate}
+            className="text-xs bg-emerald-900 hover:bg-emerald-800 text-emerald-300 border border-emerald-700 px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all">
+            {tip ? "Gerar novo" : "Gerar palpite"}
+          </button>
+        )}
+      </div>
+
+      {loading && (
+        <div className="flex items-center gap-2 text-zinc-500 text-sm py-2">
+          <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+          Analisando o jogo...
+        </div>
+      )}
+
+      {tip && !loading && (
+        <div className="bg-zinc-800/60 rounded-xl p-4">
+          <p className="text-sm text-zinc-200 leading-relaxed">{tip}</p>
+          <button onClick={() => navigator.clipboard.writeText(tip)}
+            className="mt-3 text-[10px] text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors">
+            📋 Copiar palpite
+          </button>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {!tip && !loading && !error && (
+        <p className="text-xs text-zinc-600">Clique em "Gerar palpite" para a IA analisar este jogo e criar um resumo para compartilhar.</p>
+      )}
+    </div>
+  );
+}
+
 function MatchDetail({ match }) {
   if (!match) return <div className="flex flex-col items-center justify-center h-full text-zinc-600 gap-3"><span className="text-5xl">⚽</span><p className="text-sm">Selecione uma partida</p></div>;
   const p = match.probabilidades;
@@ -396,6 +483,9 @@ function MatchDetail({ match }) {
           ))}
         </div>
       </div>
+
+      {/* AI Tip */}
+      <AITipCard match={match} />
     </div>
   );
 }
@@ -590,6 +680,97 @@ function ManualOddsModal({ match, onSave, onClose }) {
   );
 }
 
+
+// ── Histórico Page ─────────────────────────────────────────────────────────────
+function HistoricoPage({ user }) {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [league, setLeague] = useState("PL");
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await apiGet(`/analysis/history?league=${league}&limit=30`, user?.token);
+        setHistory(data || []);
+      } catch (e) {
+        setHistory([]);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [league, user?.token]);
+
+  return (
+    <div>
+      <h2 className="text-xl font-black text-white mb-1">Histórico de Análises</h2>
+      <p className="text-xs text-zinc-500 mb-4">Últimas análises realizadas pelo sistema</p>
+
+      {/* Liga selector */}
+      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
+        {LIGAS.map(l => (
+          <button key={l.code} onClick={() => setLeague(l.code)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${league === l.code ? "bg-emerald-900 text-emerald-300 border border-emerald-700" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
+            <span>{l.flag}</span><span>{l.nome}</span>
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="text-center py-16 text-zinc-500 text-sm">Carregando histórico...</div>
+      ) : history.length === 0 ? (
+        <div className="text-center py-16 text-zinc-600 flex flex-col gap-2">
+          <span className="text-4xl">📊</span>
+          <p className="text-sm">Nenhuma análise encontrada para esta liga.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {history.map((r, i) => {
+            const vbs = (r.value_bets || []).filter(v => v.is_vb);
+            const p = r.probabilidades || {};
+            return (
+              <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 hover:border-zinc-600 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-zinc-500 font-mono">{r.data} · {r.liga}</span>
+                  {vbs.length > 0 && (
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950 border border-emerald-800 px-2 py-0.5 rounded-full">
+                      {vbs.length} value {vbs.length === 1 ? "bet" : "bets"}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-bold text-white">{r.home_team}</span>
+                  <span className="text-xs text-zinc-600">vs</span>
+                  <span className="font-bold text-white">{r.away_team}</span>
+                </div>
+                <div className="flex gap-1.5 text-[11px] mb-3">
+                  {[["Casa", p.home_win], ["Empate", p.draw], ["Fora", p.away_win], ["Over 2.5", p.over_2_5]].map(([l, v]) => (
+                    <div key={l} className="flex-1 text-center bg-zinc-800 rounded-lg py-1.5">
+                      <div className="text-zinc-500">{l}</div>
+                      <div className="font-bold text-white">{v ? Math.round(v*100) : "—"}%</div>
+                    </div>
+                  ))}
+                </div>
+                {vbs.length > 0 && (
+                  <div className="space-y-1">
+                    {vbs.map((vb, j) => (
+                      <div key={j} className="flex items-center justify-between bg-emerald-950/40 border border-emerald-900/50 rounded-lg px-3 py-1.5 text-xs">
+                        <span className="text-emerald-300 font-bold">✦ {vb.mercado}</span>
+                        <span className="text-white font-mono">odd {vb.odd?.toFixed(2)}</span>
+                        <span className="text-emerald-400 font-bold">EV +{vb.ev?.toFixed(3)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const LIGAS = [
   { code: "PL",  nome: "Premier League",    flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
   { code: "CL",  nome: "Champions League",  flag: "⭐" },
@@ -732,14 +913,7 @@ function Dashboard({ user, onUpdateUser, onLogout }) {
             </div>
           )}
           {page === "valuebets" && <ValueBetsPage analyses={analyses} />}
-          {page === "historico" && (
-            <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
-              <span className="text-5xl">📊</span>
-              <h2 className="text-lg font-black text-white">Histórico</h2>
-              <p className="text-sm text-zinc-500 max-w-xs">Disponível no plano Pro.</p>
-              <span className="text-xs bg-zinc-800 border border-zinc-700 text-zinc-400 px-4 py-2 rounded-full">Em breve</span>
-            </div>
-          )}
+          {page === "historico" && <HistoricoPage user={user} />}
           {page === "planos" && <PlansPage />}
         </div>
       </main>
