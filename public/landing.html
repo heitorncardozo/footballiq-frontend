@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FootballIQ — Aposte com estatística, não com feeling</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #09090b; --bg2: #111113; --bg3: #18181b; --border: #27272a;
+      --green: #00e5a0; --green-dim: #052e1c; --green-mid: #065f46;
+      --text: #fafafa; --muted: #71717a; --red: #ef4444;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; line-height: 1.6; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; width: 100%; z-index: 100;
+      background: rgba(9,9,11,0.9); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 5%; height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 1.1rem; text-decoration: none; color: var(--text); }
+    .nav-links { display: flex; align-items: center; gap: 24px; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; transition: color .2s; }
+    .nav-links a:hover { color: var(--text); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border-radius: 12px; font-weight: 700; font-size: 0.875rem; cursor: pointer; transition: all .2s; text-decoration: none; border: none; font-family: 'DM Sans', sans-serif; }
+    .btn-primary { background: var(--green); color: #000; }
+    .btn-primary:hover { background: #00c989; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { border-color: var(--green); color: var(--green); }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+      z-index: 200; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 24px;
+      width: 100%; max-width: 420px; overflow: hidden;
+    }
+    .modal-header { padding: 24px 24px 0; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 1.1rem; font-weight: 900; }
+    .modal-close { background: none; border: none; color: var(--muted); font-size: 1.4rem; cursor: pointer; line-height: 1; padding: 4px 8px; border-radius: 8px; }
+    .modal-close:hover { color: var(--text); background: var(--bg3); }
+    .modal-tabs { display: flex; gap: 8px; padding: 16px 24px 0; }
+    .modal-tab { flex: 1; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; border: none; font-family: 'DM Sans', sans-serif; transition: all .2s; }
+    .modal-tab.active { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-mid); }
+    .modal-tab:not(.active) { background: var(--bg3); color: var(--muted); }
+    .modal-tab:not(.active):hover { color: var(--text); }
+    .modal-body { padding: 20px 24px 24px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    .field input {
+      width: 100%; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 12px; padding: 11px 14px; font-size: 0.9rem; color: var(--text);
+      outline: none; font-family: 'DM Sans', sans-serif; transition: border-color .2s;
+    }
+    .field input:focus { border-color: var(--green); }
+    .modal-error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; margin-bottom: 14px; display: none; }
+    .modal-error.show { display: block; }
+    .modal-success { background: var(--green-dim); border: 1px solid var(--green-mid); color: var(--green); border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; margin-bottom: 14px; display: none; }
+    .modal-success.show { display: block; }
+    .modal-footer { padding: 0 24px 24px; text-align: center; font-size: 0.75rem; color: var(--muted); }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh; display: flex; align-items: center;
+      padding: 120px 5% 80px;
+      background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(0,229,160,0.08) 0%, transparent 70%);
+    }
+    .hero-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; background: var(--green-dim); border: 1px solid var(--green-mid); color: var(--green); padding: 6px 14px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; margin-bottom: 24px; }
+    h1 { font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 900; line-height: 1.15; margin-bottom: 20px; }
+    h1 span { color: var(--green); }
+    .hero p { color: var(--muted); font-size: 1.05rem; margin-bottom: 36px; max-width: 480px; }
+    .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+    .hero-stats { display: flex; gap: 32px; margin-top: 48px; }
+    .stat-num { font-size: 1.8rem; font-weight: 900; color: var(--green); }
+    .stat-label { font-size: 0.78rem; color: var(--muted); }
+
+    /* DASHBOARD PREVIEW */
+    .dashboard-preview { background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 20px; box-shadow: 0 40px 80px rgba(0,0,0,0.5); }
+    .preview-bar { display: flex; gap: 6px; margin-bottom: 16px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #ef4444; } .dot-y { background: #f59e0b; } .dot-g { background: #22c55e; }
+    .preview-match { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+    .preview-teams { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 10px; font-size: 0.9rem; }
+    .preview-probs { display: flex; gap: 6px; }
+    .prob-box { flex: 1; background: var(--bg3); border-radius: 8px; padding: 8px; text-align: center; font-size: 0.75rem; }
+    .prob-box .num { font-weight: 900; font-size: 1rem; }
+    .prob-box .lbl { color: var(--muted); font-size: 0.65rem; }
+    .value-tag { display: inline-block; background: var(--green-dim); border: 1px solid var(--green-mid); color: var(--green); border-radius: 6px; padding: 2px 8px; font-size: 0.65rem; font-weight: 700; }
+    .preview-vb { background: rgba(0,229,160,0.05); border: 1px solid rgba(0,229,160,0.2); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 0.8rem; }
+    .ev-pos { color: var(--green); font-weight: 900; font-family: 'DM Mono', monospace; }
+
+    /* SECTIONS */
+    .section { padding: 100px 5%; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-label { color: var(--green); font-size: 0.78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 12px; }
+    h2 { font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 900; margin-bottom: 16px; }
+    .section-sub { color: var(--muted); max-width: 560px; margin-bottom: 56px; }
+
+    /* STEPS */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .step { background: var(--bg2); border: 1px solid var(--border); border-radius: 20px; padding: 28px; position: relative; }
+    .step-num { font-size: 3rem; font-weight: 900; color: var(--border); position: absolute; top: 16px; right: 20px; font-family: 'DM Mono', monospace; }
+    .step-icon { font-size: 2rem; margin-bottom: 16px; }
+    .step h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+    .step p { color: var(--muted); font-size: 0.875rem; }
+
+    /* EXAMPLE */
+    .example-section { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .example-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 32px; max-width: 700px; margin: 0 auto; }
+    .example-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+    .example-title { font-size: 0.7rem; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+    .example-match { font-size: 1.3rem; font-weight: 900; }
+    .example-badge { background: var(--green-dim); border: 1px solid var(--green-mid); color: var(--green); border-radius: 10px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700; }
+    .market-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; align-items: center; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 6px; }
+    .market-row.header { color: var(--muted); font-size: 0.7rem; padding: 0 14px; margin-bottom: 8px; }
+    .market-row.value-row { background: rgba(0,229,160,0.06); border: 1px solid rgba(0,229,160,0.15); }
+    .market-row.normal { background: var(--bg2); border: 1px solid var(--border); }
+    .mono { font-family: 'DM Mono', monospace; }
+    .ev-green { color: var(--green); font-weight: 900; }
+    .ev-red { color: var(--red); }
+    .ai-tip-box { margin-top: 20px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .ai-tip-label { font-size: 0.7rem; color: var(--muted); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+    .ai-tip-text { font-size: 0.875rem; color: #d4d4d8; line-height: 1.6; }
+
+    /* LEAGUES */
+    .leagues { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 40px; }
+    .league-badge { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 18px; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+    /* PLANS */
+    .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .plan { background: var(--bg2); border: 1px solid var(--border); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 20px; }
+    .plan.popular { border-color: var(--green); background: rgba(0,229,160,0.03); }
+    .plan-badge { background: var(--green-dim); border: 1px solid var(--green-mid); color: var(--green); border-radius: 999px; padding: 4px 12px; font-size: 0.7rem; font-weight: 700; width: fit-content; }
+    .plan-name { font-size: 1.2rem; font-weight: 900; }
+    .plan-price { font-size: 2rem; font-weight: 900; }
+    .plan-price span { font-size: 0.875rem; font-weight: 400; color: var(--muted); }
+    .plan-features { list-style: none; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+    .plan-features li { font-size: 0.875rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+    .plan-features li::before { content: "✓"; color: var(--green); font-weight: 700; }
+
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 12px; max-width: 700px; }
+    .faq-item { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; cursor: pointer; }
+    .faq-q { font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+    .faq-q::after { content: "+"; color: var(--green); font-size: 1.2rem; }
+    .faq-item.open .faq-q::after { content: "−"; }
+    .faq-a { color: var(--muted); font-size: 0.875rem; margin-top: 12px; display: none; }
+    .faq-item.open .faq-a { display: block; }
+
+    /* CTA FINAL */
+    .cta-final { text-align: center; padding: 100px 5%; background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(0,229,160,0.06) 0%, transparent 70%); }
+    .cta-final h2 { font-size: clamp(1.8rem, 4vw, 3rem); margin-bottom: 16px; }
+    .cta-final p { color: var(--muted); max-width: 500px; margin: 0 auto 36px; }
+
+    /* FOOTER */
+    footer { border-top: 1px solid var(--border); padding: 32px 5%; text-align: center; color: var(--muted); font-size: 0.8rem; }
+
+    /* TOAST */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding: 12px 20px; border-radius: 12px; font-size: 0.875rem; font-weight: 600; z-index: 300; opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .hero-inner { grid-template-columns: 1fr; }
+      .dashboard-preview { display: none; }
+      .steps { grid-template-columns: 1fr; }
+      .plans { grid-template-columns: 1fr; }
+      .nav-links .btn-outline { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- MODAL DE LOGIN/CADASTRO -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚽ FootballIQ</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tabLogin" onclick="switchTab('login')">Entrar</button>
+      <button class="modal-tab" id="tabRegister" onclick="switchTab('register')">Cadastrar</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-error" id="modalError"></div>
+      <div class="modal-success" id="modalSuccess"></div>
+
+      <!-- Login form -->
+      <div id="loginForm">
+        <div class="field">
+          <label>E-mail</label>
+          <input type="email" id="loginEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter') submitLogin()" />
+        </div>
+        <div class="field">
+          <label>Senha</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter') submitLogin()" />
+        </div>
+        <button class="btn btn-primary" style="width:100%" id="loginBtn" onclick="submitLogin()">
+          Entrar na minha conta
+        </button>
+      </div>
+
+      <!-- Register form -->
+      <div id="registerForm" style="display:none">
+        <div class="field">
+          <label>Nome</label>
+          <input type="text" id="regName" placeholder="Seu nome" />
+        </div>
+        <div class="field">
+          <label>E-mail</label>
+          <input type="email" id="regEmail" placeholder="seu@email.com" />
+        </div>
+        <div class="field">
+          <label>Senha</label>
+          <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" onkeydown="if(event.key==='Enter') submitRegister()" />
+        </div>
+        <button class="btn btn-primary" style="width:100%" id="registerBtn" onclick="submitRegister()">
+          Criar conta grátis
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">Seus dados são protegidos e nunca compartilhados.</div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a class="logo" href="#">⚽ FootballIQ</a>
+  <div class="nav-links">
+    <a href="#como-funciona">Como funciona</a>
+    <a href="#ligas">Ligas</a>
+    <a href="#planos">Planos</a>
+    <button class="btn btn-outline" onclick="openModal('login')">Entrar</button>
+    <button class="btn btn-primary" onclick="openModal('register')">Começar grátis</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="badge">✦ Modelo matemático profissional</div>
+      <h1>Pare de apostar<br />no feeling.<br /><span>Use estatística.</span></h1>
+      <p>FootballIQ analisa as odds das casas e encontra as apostas que realmente têm valor — usando o mesmo modelo matemático de analistas profissionais.</p>
+      <div class="hero-ctas">
+        <button class="btn btn-primary" style="font-size:1rem;padding:14px 28px" onclick="openModal('register')">🚀 Começar grátis agora</button>
+        <a href="#como-funciona" class="btn btn-outline" style="font-size:1rem;padding:14px 28px">Como funciona</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><div class="stat-num">6</div><div class="stat-label">Ligas monitoradas</div></div>
+        <div class="stat"><div class="stat-num">95%</div><div class="stat-label">Precisão do modelo</div></div>
+        <div class="stat"><div class="stat-num">24h</div><div class="stat-label">Análises atualizadas</div></div>
+      </div>
+    </div>
+    <div class="dashboard-preview">
+      <div class="preview-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      <div class="preview-match">
+        <div style="font-size:.65rem;color:var(--muted);margin-bottom:8px;font-family:'DM Mono',monospace">🏴󠁧󠁢󠁥󠁮󠁧󠁿 PREMIER LEAGUE · hoje</div>
+        <div class="preview-teams"><span>Manchester City</span><span style="color:var(--muted);font-size:.8rem">vs</span><span>Arsenal</span></div>
+        <div class="preview-probs">
+          <div class="prob-box"><div class="num">48%</div><div class="lbl">Casa</div></div>
+          <div class="prob-box"><div class="num">22%</div><div class="lbl">Empate</div></div>
+          <div class="prob-box"><div class="num">30%</div><div class="lbl">Fora</div></div>
+          <div class="prob-box"><div class="num">71%</div><div class="lbl">Over 2.5</div></div>
+        </div>
+        <div class="preview-vb"><span>✦ Over 2.5 gols <span class="value-tag">VALUE BET</span></span><span class="ev-pos">EV +0.134</span></div>
+      </div>
+      <div class="preview-match">
+        <div style="font-size:.65rem;color:var(--muted);margin-bottom:8px;font-family:'DM Mono',monospace">⭐ CHAMPIONS LEAGUE · amanhã</div>
+        <div class="preview-teams"><span>Real Madrid</span><span style="color:var(--muted);font-size:.8rem">vs</span><span>Bayern</span></div>
+        <div class="preview-probs">
+          <div class="prob-box"><div class="num">52%</div><div class="lbl">Casa</div></div>
+          <div class="prob-box"><div class="num">20%</div><div class="lbl">Empate</div></div>
+          <div class="prob-box"><div class="num">28%</div><div class="lbl">Fora</div></div>
+          <div class="prob-box"><div class="num">68%</div><div class="lbl">Over 2.5</div></div>
+        </div>
+        <div class="preview-vb"><span>✦ Casa (1) <span class="value-tag">VALUE BET</span></span><span class="ev-pos">EV +0.089</span></div>
+      </div>
+      <div style="text-align:center;font-size:.7rem;color:var(--muted);margin-top:12px">🤖 Palpites gerados por IA disponíveis</div>
+    </div>
+  </div>
+</section>
+
+<!-- COMO FUNCIONA -->
+<section class="section" id="como-funciona">
+  <div class="section-inner">
+    <div class="section-label">Como funciona</div>
+    <h2>Da matemática ao palpite, em segundos</h2>
+    <p class="section-sub">Sem achismos. Sem feeling. Só estatística aplicada a cada partida.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-icon">📊</div>
+        <h3>Coleta de dados</h3>
+        <p>O sistema busca automaticamente os últimos jogos de cada time e calcula médias de gols, aproveitamento e tendências históricas.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-icon">🧮</div>
+        <h3>Modelo Poisson</h3>
+        <p>Usa distribuição de Poisson para calcular a probabilidade real de cada resultado — o mesmo modelo usado por analistas profissionais.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-icon">✦</div>
+        <h3>Value Bet detectado</h3>
+        <p>Compara a probabilidade calculada com as odds das casas. Quando a casa paga mais do que deveria, você é avisado imediatamente.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EXEMPLO -->
+<section class="section example-section">
+  <div class="section-inner">
+    <div class="section-label">Exemplo real</div>
+    <h2>Veja uma análise completa</h2>
+    <p class="section-sub">Isso é exatamente o que você vê no dashboard para cada jogo.</p>
+    <div class="example-card">
+      <div class="example-header">
+        <div>
+          <div class="example-title">🏴󠁧󠁢󠁥󠁮󠁧󠁿 PREMIER LEAGUE · 2026-03-25</div>
+          <div class="example-match">Liverpool vs Chelsea</div>
+          <div style="font-size:.8rem;color:var(--muted);margin-top:4px">Gols esperados: Casa 2.1 · Fora 1.3</div>
+        </div>
+        <div class="example-badge">3 value bets</div>
+      </div>
+      <div class="market-row header"><span>Mercado</span><span>Odd</span><span>P.Calc</span><span>P.Impl</span><span>EV</span></div>
+      <div class="market-row value-row"><span class="mono" style="color:var(--green);font-weight:700">✦ Casa (1)</span><span class="mono">1.95</span><span>53.2%</span><span>51.3%</span><span class="ev-green mono">+0.038</span></div>
+      <div class="market-row value-row"><span class="mono" style="color:var(--green);font-weight:700">✦ Over 2.5</span><span class="mono">1.72</span><span>68.4%</span><span>58.1%</span><span class="ev-green mono">+0.177</span></div>
+      <div class="market-row normal"><span class="mono">Empate (X)</span><span class="mono">3.80</span><span>21.1%</span><span>26.3%</span><span class="ev-red mono">-0.197</span></div>
+      <div class="market-row normal"><span class="mono">Fora (2)</span><span class="mono">4.20</span><span>25.7%</span><span>23.8%</span><span class="ev-green mono">+0.079</span></div>
+      <div class="ai-tip-box">
+        <div class="ai-tip-label">🤖 Palpite gerado por IA</div>
+        <div class="ai-tip-text">Liverpool recebe o Chelsea com clara vantagem em casa. O modelo aponta Over 2.5 como o mercado de maior valor — ambos os times têm média ofensiva alta nas últimas rodadas. A odd de 1.72 está acima do valor justo calculado de 1.46. Aposte com responsabilidade.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LIGAS -->
+<section class="section" id="ligas">
+  <div class="section-inner" style="text-align:center">
+    <div class="section-label">Cobertura</div>
+    <h2>6 ligas monitoradas todo dia</h2>
+    <p class="section-sub" style="margin:0 auto 0">Análises atualizadas automaticamente todas as manhãs.</p>
+    <div class="leagues">
+      <div class="league-badge">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</div>
+      <div class="league-badge">⭐ Champions League</div>
+      <div class="league-badge">🇪🇸 La Liga</div>
+      <div class="league-badge">🇮🇹 Serie A</div>
+      <div class="league-badge">🇩🇪 Bundesliga</div>
+      <div class="league-badge">🇫🇷 Ligue 1</div>
+    </div>
+  </div>
+</section>
+
+<!-- PLANOS -->
+<section class="section" id="planos" style="background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="section-inner">
+    <div class="section-label">Planos</div>
+    <h2>Comece grátis, escale quando quiser</h2>
+    <p class="section-sub">Sem cartão de crédito para começar.</p>
+    <div class="plans">
+      <div class="plan">
+        <div><div class="plan-name">Free</div><div class="plan-price">R$ 0 <span>/ para sempre</span></div></div>
+        <ul class="plan-features">
+          <li>5 análises por dia</li><li>Premier League</li>
+          <li>Value bets básicos</li><li>Inserção manual de odds</li>
+        </ul>
+        <button class="btn btn-outline" onclick="openModal('register')">Começar grátis</button>
+      </div>
+      <div class="plan popular">
+        <div class="plan-badge">MAIS POPULAR</div>
+        <div><div class="plan-name">Pro</div><div class="plan-price">R$ 29,90 <span>/ mês</span></div></div>
+        <ul class="plan-features">
+          <li>50 análises por dia</li><li>Todas as 6 ligas</li>
+          <li>Value bets em tempo real</li><li>Palpites gerados por IA</li>
+          <li>Histórico completo</li><li>Export CSV</li>
+        </ul>
+        <button class="btn btn-primary" onclick="showToast('🚀 Pagamentos em breve! Cadastre-se grátis enquanto isso.')">Em breve</button>
+      </div>
+      <div class="plan">
+        <div><div class="plan-name">Premium</div><div class="plan-price">R$ 79,90 <span>/ mês</span></div></div>
+        <ul class="plan-features">
+          <li>Análises ilimitadas</li><li>Todas as ligas</li>
+          <li>Acesso à API</li><li>Histórico completo</li>
+          <li>Suporte prioritário</li><li>Alertas no Telegram</li>
+        </ul>
+        <button class="btn btn-outline" onclick="showToast('🚀 Pagamentos em breve! Cadastre-se grátis enquanto isso.')">Em breve</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-label">Dúvidas</div>
+    <h2>Perguntas frequentes</h2>
+    <p class="section-sub">Tudo que você precisa saber antes de começar.</p>
+    <div class="faq-list">
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">O FootballIQ garante lucro nas apostas?</div>
+        <div class="faq-a">Não. Nenhum sistema garante lucro garantido em apostas. O FootballIQ identifica oportunidades estatisticamente favoráveis (value bets), o que aumenta suas chances no longo prazo — mas apostas sempre envolvem risco.</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">O que é um Value Bet?</div>
+        <div class="faq-a">É uma aposta onde a probabilidade real de acontecer é maior do que a probabilidade implícita na odd da casa. Ou seja, a casa está pagando mais do que deveria — e isso é uma vantagem matemática para o apostador.</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">Como funciona o modelo Poisson?</div>
+        <div class="faq-a">É um modelo matemático que usa a média histórica de gols dos times para calcular a probabilidade de cada placar possível — e com isso estima a chance de vitória, empate e vários mercados de aposta.</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">Precisa de cartão de crédito para usar grátis?</div>
+        <div class="faq-a">Não. O plano gratuito não exige cartão de crédito. Basta criar uma conta com e-mail e senha — leva menos de 1 minuto.</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">As odds da Betano e Bet365 estão integradas?</div>
+        <div class="faq-a">Você insere as odds manualmente no dashboard e o sistema calcula o EV na hora. A integração automática está em desenvolvimento.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-final">
+  <div class="section-label">Comece agora</div>
+  <h2>Chega de apostar no feeling.<br />Use matemática.</h2>
+  <p>Crie sua conta grátis em menos de 1 minuto e veja os value bets de hoje.</p>
+  <button class="btn btn-primary" style="font-size:1rem;padding:14px 32px" onclick="openModal('register')">🚀 Criar conta grátis</button>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>⚽ FootballIQ · Análise estatística de futebol · 2026</p>
+  <p style="margin-top:8px">Jogue com responsabilidade. Apostas envolvem risco financeiro.</p>
+</footer>
+
+<script>
+  // ── Configuração ──────────────────────────────────────────────────────────────
+  const API_URL      = "https://footballiq-backend-production-089f.up.railway.app";
+  const DASHBOARD    = "https://footballiq-frontend.vercel.app";
+
+  // ── Toast ─────────────────────────────────────────────────────────────────────
+  function showToast(msg, duration = 3000) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), duration);
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────────────────────
+  function openModal(tab = "login") {
+    clearModalMessages();
+    switchTab(tab);
+    document.getElementById("authModal").classList.add("active");
+    setTimeout(() => {
+      const input = tab === "login"
+        ? document.getElementById("loginEmail")
+        : document.getElementById("regName");
+      input?.focus();
+    }, 100);
+  }
+
+  function closeModal() {
+    document.getElementById("authModal").classList.remove("active");
+    clearModalMessages();
+  }
+
+  // Fecha ao clicar fora
+  document.getElementById("authModal").addEventListener("click", function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Fecha com ESC
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+  function switchTab(tab) {
+    clearModalMessages();
+    const isLogin = tab === "login";
+    document.getElementById("loginForm").style.display    = isLogin ? "block" : "none";
+    document.getElementById("registerForm").style.display = isLogin ? "none"  : "block";
+    document.getElementById("tabLogin").classList.toggle("active",    isLogin);
+    document.getElementById("tabRegister").classList.toggle("active", !isLogin);
+  }
+
+  function clearModalMessages() {
+    setError(""); setSuccess("");
+  }
+
+  function setError(msg) {
+    const el = document.getElementById("modalError");
+    el.textContent = msg;
+    el.classList.toggle("show", !!msg);
+  }
+
+  function setSuccess(msg) {
+    const el = document.getElementById("modalSuccess");
+    el.textContent = msg;
+    el.classList.toggle("show", !!msg);
+  }
+
+  function setLoading(btnId, loading, label) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    btn.textContent = loading ? "Aguarde..." : label;
+  }
+
+  // ── Login ─────────────────────────────────────────────────────────────────────
+  async function submitLogin() {
+    const email    = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+
+    if (!email || !password) { setError("Preencha e-mail e senha."); return; }
+
+    setLoading("loginBtn", true, "Entrar na minha conta");
+    clearModalMessages();
+
+    try {
+      const r = await fetch(`${API_URL}/auth/login`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email, password }),
+      });
+      const data = await r.json();
+
+      if (!r.ok) { setError(data.detail || "E-mail ou senha incorretos."); return; }
+
+      // Salva dados do usuário
+      localStorage.setItem("footballiq_user", JSON.stringify({
+        name:  data.name,
+        plan:  data.plan,
+        token: data.token,
+        email,
+        avatar: null,
+      }));
+
+      showToast("✅ Login feito! Redirecionando...");
+      setTimeout(() => window.location.href = DASHBOARD, 1000);
+
+    } catch (e) {
+      setError("Erro de conexão. Verifique sua internet.");
+    } finally {
+      setLoading("loginBtn", false, "Entrar na minha conta");
+    }
+  }
+
+  // ── Cadastro ──────────────────────────────────────────────────────────────────
+  async function submitRegister() {
+    const name     = document.getElementById("regName").value.trim();
+    const email    = document.getElementById("regEmail").value.trim();
+    const password = document.getElementById("regPassword").value;
+
+    if (!name)            { setError("Digite seu nome.");               return; }
+    if (!email)           { setError("Digite seu e-mail.");             return; }
+    if (password.length < 6) { setError("Senha mínima: 6 caracteres."); return; }
+
+    setLoading("registerBtn", true, "Criar conta grátis");
+    clearModalMessages();
+
+    try {
+      // 1. Cria a conta
+      const r = await fetch(`${API_URL}/auth/register`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ name, email, password }),
+      });
+      const data = await r.json();
+
+      if (!r.ok) { setError(data.detail || "Erro ao criar conta."); return; }
+
+      setSuccess("✅ Conta criada! Fazendo login automático...");
+
+      // 2. Login automático
+      const lr = await fetch(`${API_URL}/auth/login`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email, password }),
+      });
+      const ldata = await lr.json();
+
+      if (lr.ok) {
+        localStorage.setItem("footballiq_user", JSON.stringify({
+          name:  ldata.name,
+          plan:  ldata.plan,
+          token: ldata.token,
+          email,
+          avatar: null,
+        }));
+        showToast("🚀 Bem-vindo ao FootballIQ!");
+        setTimeout(() => window.location.href = DASHBOARD, 1200);
+      } else {
+        // Cadastrou mas login falhou — manda para login manual
+        setSuccess("✅ Conta criada! Faça login agora.");
+        setTimeout(() => switchTab("login"), 2000);
+      }
+
+    } catch (e) {
+      setError("Erro de conexão. Verifique sua internet.");
+    } finally {
+      setLoading("registerBtn", false, "Criar conta grátis");
+    }
+  }
+
+  // ── FAQ accordion ─────────────────────────────────────────────────────────────
+  function toggleFaq(el) {
+    el.classList.toggle("open");
+  }
+
+  // ── Redireciona se já logado ──────────────────────────────────────────────────
+  (function checkAuth() {
+    try {
+      const user = JSON.parse(localStorage.getItem("footballiq_user"));
+      if (user?.token) {
+        // Usuário já logado — mostra botão de ir para o dashboard
+        const nav = document.querySelector(".nav-links");
+        const btnEntrar = nav.querySelector(".btn-outline");
+        if (btnEntrar) {
+          btnEntrar.textContent = "Ir para o Dashboard";
+          btnEntrar.onclick = () => window.location.href = DASHBOARD;
+        }
+      }
+    } catch(e) {}
+  })();
+</script>
+</body>
+</html>
